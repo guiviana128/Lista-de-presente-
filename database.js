@@ -48,64 +48,8 @@ function initDatabase() {
     console.log('✅ Usuários padrão criados: Rayza e Guilherme (PIN padrão: 1234)');
   }
 
-  // Se a tabela de presentes estiver vazia, cria 2 exemplos carinhosos para já mostrar o layout funcionando
-  const countGiftsStmt = db.prepare('SELECT COUNT(*) as count FROM gifts');
-  const giftCount = countGiftsStmt.get().count;
+  // Garante que a tabela de presentes existe limpa para o casal adicionar seus presentes
 
-  if (giftCount === 0) {
-    const insertGift = db.prepare(`
-      INSERT INTO gifts (
-        title, url, image_url, price, category, priority, description, created_by, for_who, is_reserved, reserved_by, is_bought
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    insertGift.run(
-      'Perfume Good Girl Carolina Herrera 80ml',
-      'https://www.sephora.com.br',
-      'https://images.unsplash.com/photo-1541643600914-78b084683601?w=500&auto=format&fit=crop&q=60',
-      589.00,
-      'Beleza & Perfumaria',
-      '⭐⭐⭐ Sonho de Consumo',
-      'O frasco em formato de sapatinho! Meu perfume favorito da vida.',
-      'Rayza',
-      'Rayza',
-      0,
-      '',
-      0
-    );
-
-    insertGift.run(
-      'Fone Bluetooth Sony WH-1000XM5 com Cancelamento de Ruído',
-      'https://www.amazon.com.br',
-      'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&auto=format&fit=crop&q=60',
-      1899.90,
-      'Eletrônicos & Tech',
-      '⭐⭐ Quero Muito',
-      'Cor preta ou prata. Perfeito para estudar, trabalhar e ouvir música juntinhos.',
-      'Guilherme',
-      'Guilherme',
-      0,
-      '',
-      0
-    );
-
-    insertGift.run(
-      'Jantar Romântico & Piquenique ao Pôr do Sol',
-      'https://www.google.com/maps',
-      'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=500&auto=format&fit=crop&q=60',
-      220.00,
-      'Experiências & Encontros',
-      '⭐⭐⭐ Sonho de Consumo',
-      'Uma cesta com queijos, vinho, frutas e velas para nosso dia especial.',
-      'Guilherme',
-      'Nós Dois',
-      0,
-      '',
-      0
-    );
-
-    console.log('✅ Presentes de exemplo inseridos com sucesso!');
-  }
 }
 
 // Inicializa ao carregar o arquivo
