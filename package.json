@@ -1,0 +1,12 @@
+{
+  "name": "lista-de-presentes-amor",
+  "version": "1.0.0",
+  "description": "Lista de Presentes e Desejos compartilhada para Rayza e Guilherme",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": ["wishlist", "presentes", "couple"],
+  "author": "",
+  "license": "ISC"
+}

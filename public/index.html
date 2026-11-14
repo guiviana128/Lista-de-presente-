@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lista de Presentes do Casal | Rayza & Guilherme 💖</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Cabeçalho Principal -->
+  <header class="main-header">
+    <div class="container header-content">
+      <div class="logo-area">
+        <div class="heart-badge">💑</div>
+        <div>
+          <h1 class="couple-title">Rayza & Guilherme</h1>
+          <p class="couple-subtitle">Nossa Lista de Presentes & Desejos Compartilhada ✨</p>
+        </div>
+      </div>
+
+      <!-- Área do Usuário Conectado -->
+      <div class="user-pill-container">
+        <div class="active-user-badge" id="activeUserBadge" onclick="openProfileModal()">
+          <span class="user-avatar" id="headerAvatar">🌸</span>
+          <div class="user-info">
+            <span class="logged-as">Você está como:</span>
+            <strong class="user-name" id="headerUserName">Rayza</strong>
+          </div>
+          <button class="switch-profile-btn" title="Trocar Perfil">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 17H4M4 17L8 13M4 17L8 21M4 7H20M20 7L16 3M20 7L16 11"/>
+            </svg>
+            Trocar
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Banner de Estatísticas -->
+  <section class="stats-section">
+    <div class="container stats-grid">
+      <div class="stat-card stat-total" onclick="filterByRecipient('Todos')">
+        <div class="stat-icon">🎁</div>
+        <div class="stat-info">
+          <span class="stat-value" id="statTotal">0</span>
+          <span class="stat-label">Total de Presentes</span>
+        </div>
+      </div>
+
+      <div class="stat-card stat-rayza" onclick="filterByRecipient('Rayza')">
+        <div class="stat-icon">🌸</div>
+        <div class="stat-info">
+          <span class="stat-value" id="statRayza">0</span>
+          <span class="stat-label">Desejos da Rayza</span>
+        </div>
+      </div>
+
+      <div class="stat-card stat-guilherme" onclick="filterByRecipient('Guilherme')">
+        <div class="stat-icon">💙</div>
+        <div class="stat-info">
+          <span class="stat-value" id="statGuilherme">0</span>
+          <span class="stat-label">Desejos do Guilherme</span>
+        </div>
+      </div>
+
+      <div class="stat-card stat-both" onclick="filterByRecipient('Nós Dois')">
+        <div class="stat-icon">💑</div>
+        <div class="stat-info">
+          <span class="stat-value" id="statBoth">0</span>
+          <span class="stat-label">Para Nós Dois</span>
+        </div>
+      </div>
+
+      <div class="stat-card stat-bought" onclick="filterByStatus('comprado')">
+        <div class="stat-icon">🎉</div>
+        <div class="stat-info">
+          <span class="stat-value" id="statBought">0</span>
+          <span class="stat-label">Já Comprados</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Barra de Ações & Filtros -->
+  <main class="container main-content">
+    <div class="action-bar-card">
+      <div class="search-and-btn">
+        <div class="search-box">
+          <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="searchInput" placeholder="Pesquisar presentes, lojas, marcas ou detalhes..." oninput="handleSearch()">
+          <button id="clearSearchBtn" class="clear-search-btn" onclick="clearSearch()" style="display:none;">✕</button>
+        </div>
+        <button class="btn btn-primary" onclick="openAddModal()">
+          <span class="btn-icon">✨</span>
+          <span>Adicionar Presente</span>
+        </button>
+      </div>
+
+      <!-- Filtros Rápidos -->
+      <div class="filters-row">
+        <!-- Filtro por Quem -->
+        <div class="filter-group">
+          <span class="filter-label">Destinatário:</span>
+          <div class="segmented-control" id="recipientTabs">
+            <button class="segment-btn active" data-recipient="Todos" onclick="selectRecipientTab('Todos')">Todos</button>
+            <button class="segment-btn" data-recipient="Rayza" onclick="selectRecipientTab('Rayza')">Rayza 🌸</button>
+            <button class="segment-btn" data-recipient="Guilherme" onclick="selectRecipientTab('Guilherme')">Guilherme 💙</button>
+            <button class="segment-btn" data-recipient="Nós Dois" onclick="selectRecipientTab('Nós Dois')">Nós Dois 💑</button>
+          </div>
+        </div>
+
+        <div class="filter-dropdowns">
+          <!-- Categoria -->
+          <div class="select-wrapper">
+            <label for="categorySelect">Categoria:</label>
+            <select id="categorySelect" onchange="applyFilters()">
+              <option value="Todas">Todas as categorias</option>
+              <option value="Beleza & Perfumaria">Beleza & Perfumaria</option>
+              <option value="Roupas & Acessórios">Roupas & Acessórios</option>
+              <option value="Eletrônicos & Tech">Eletrônicos & Tech</option>
+              <option value="Livros & Papelaria">Livros & Papelaria</option>
+              <option value="Experiências & Encontros">Experiências & Encontros</option>
+              <option value="Casa & Decoração">Casa & Decoração</option>
+              <option value="Geral">Outros</option>
+            </select>
+          </div>
+
+          <!-- Status -->
+          <div class="select-wrapper">
+            <label for="statusSelect">Status:</label>
+            <select id="statusSelect" onchange="applyFilters()">
+              <option value="">Todos os status</option>
+              <option value="disponivel">Apenas Disponíveis</option>
+              <option value="reservado">Reservados em Segredo 🤫</option>
+              <option value="comprado">Já Comprados 🎉</option>
+            </select>
+          </div>
+
+          <!-- Ordenação -->
+          <div class="select-wrapper">
+            <label for="sortSelect">Ordenar por:</label>
+            <select id="sortSelect" onchange="applyFilters()">
+              <option value="recent">Mais Recentes</option>
+              <option value="price_asc">Menor Preço</option>
+              <option value="price_desc">Maior Preço</option>
+              <option value="priority">Maior Prioridade</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lista de Presentes -->
+    <div class="list-header-row">
+      <h2 class="section-heading" id="listHeading">Todos os Presentes</h2>
+      <span class="count-badge" id="resultsCount">0 itens encontrados</span>
+    </div>
+
+    <div id="loadingIndicator" class="loading-state">
+      <div class="spinner"></div>
+      <p>Carregando desejos...</p>
+    </div>
+
+    <div id="emptyState" class="empty-state" style="display: none;">
+      <div class="empty-icon">🎁✨</div>
+      <h3>Nenhum presente encontrado</h3>
+      <p>Nenhum item corresponde aos filtros ou a lista ainda está vazia.</p>
+      <button class="btn btn-primary" onclick="openAddModal()">Adicionar o Primeiro Presente 💝</button>
+    </div>
+
+    <!-- Grid de Cards de Presente -->
+    <div class="gifts-grid" id="giftsGrid">
+      <!-- Inserido dinamicamente via app.js -->
+    </div>
+  </main>
+
+  <!-- Rodapé -->
+  <footer class="main-footer">
+    <div class="container footer-content">
+      <p>Feito com amor para <strong>Rayza</strong> & <strong>Guilherme</strong> 💖</p>
+      <p class="footer-sub">Seus presentes ficam salvos permanentemente no banco de dados SQLite.</p>
+    </div>
+  </footer>
+
+  <!-- MODAL: Adicionar / Editar Presente -->
+  <div class="modal-overlay" id="giftModal" onclick="handleModalOverlayClick(event, 'giftModal')">
+    <div class="modal-box modal-lg">
+      <div class="modal-header">
+        <h3 id="modalTitle">💝 Adicionar Novo Presente</h3>
+        <button class="modal-close-btn" onclick="closeGiftModal()">✕</button>
+      </div>
+
+      <form id="giftForm" onsubmit="handleGiftFormSubmit(event)">
+        <input type="hidden" id="giftId" value="">
+
+        <div class="form-grid">
+          <!-- Nome do Presente -->
+          <div class="form-group full-width">
+            <label for="giftTitle">Nome do Presente / Produto *</label>
+            <input type="text" id="giftTitle" required placeholder="Ex: Perfume Good Girl, Tênis Nike, Livro...">
+          </div>
+
+          <!-- Link do Produto -->
+          <div class="form-group full-width">
+            <label for="giftUrl">Link do Produto (URL da Loja) *</label>
+            <div class="input-with-button">
+              <input type="url" id="giftUrl" required placeholder="https://www.loja.com.br/produto...">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="testUrl()">Testar Link ↗</button>
+            </div>
+            <small class="helper-text">Copie e cole o link da Amazon, Mercado Livre, Shopee, Shein, Zara, etc.</small>
+          </div>
+
+          <!-- Para Quem É -->
+          <div class="form-group">
+            <label for="giftForWho">Para quem é o presente? *</label>
+            <select id="giftForWho" required>
+              <option value="Rayza">Rayza 🌸</option>
+              <option value="Guilherme">Guilherme 💙</option>
+              <option value="Nós Dois">Para Nós Dois 💑</option>
+            </select>
+          </div>
+
+          <!-- Preço Estimado -->
+          <div class="form-group">
+            <label for="giftPrice">Valor Estimado (R$)</label>
+            <input type="number" id="giftPrice" step="0.01" min="0" placeholder="0.00">
+          </div>
+
+          <!-- Categoria -->
+          <div class="form-group">
+            <label for="giftCategory">Categoria</label>
+            <select id="giftCategory">
+              <option value="Beleza & Perfumaria">Beleza & Perfumaria</option>
+              <option value="Roupas & Acessórios">Roupas & Acessórios</option>
+              <option value="Eletrônicos & Tech">Eletrônicos & Tech</option>
+              <option value="Livros & Papelaria">Livros & Papelaria</option>
+              <option value="Experiências & Encontros">Experiências & Encontros</option>
+              <option value="Casa & Decoração">Casa & Decoração</option>
+              <option value="Geral">Outros</option>
+            </select>
+          </div>
+
+          <!-- Prioridade -->
+          <div class="form-group">
+            <label for="giftPriority">Nível de Desejo / Prioridade</label>
+            <select id="giftPriority">
+              <option value="⭐⭐⭐ Sonho de Consumo">⭐⭐⭐ Sonho de Consumo!</option>
+              <option value="⭐⭐ Quero Muito" selected>⭐⭐ Quero Muito</option>
+              <option value="⭐ Se Der">⭐ Se Der / Ideia Legal</option>
+            </select>
+          </div>
+
+          <!-- Link da Imagem -->
+          <div class="form-group full-width">
+            <label for="giftImageUrl">Link da Foto / Imagem do Produto (Opcional)</label>
+            <input type="url" id="giftImageUrl" placeholder="https://exemplo.com/foto.jpg" oninput="updateImagePreview()">
+            <small class="helper-text">Se não colocar imagem, usaremos uma foto ilustrativa linda da categoria.</small>
+            <div id="imagePreviewContainer" class="image-preview-container" style="display:none;">
+              <img id="imagePreview" src="" alt="Preview">
+            </div>
+          </div>
+
+          <!-- Descrição / Detalhes -->
+          <div class="form-group full-width">
+            <label for="giftDescription">Descrição / Observações</label>
+            <textarea id="giftDescription" rows="3" placeholder="Ex: Tamanho M, Cor Azul Marinho, modelo 128GB, cupom de primeira compra..."></textarea>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeGiftModal()">Cancelar</button>
+          <button type="submit" class="btn btn-primary" id="saveGiftBtn">Salvar Presente 💖</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: Trocar Perfil / Login -->
+  <div class="modal-overlay" id="profileModal" onclick="handleModalOverlayClick(event, 'profileModal')">
+    <div class="modal-box modal-sm">
+      <div class="modal-header">
+        <h3>💑 Quem está navegando?</h3>
+        <button class="modal-close-btn" onclick="closeProfileModal()">✕</button>
+      </div>
+
+      <div class="profile-cards-grid">
+        <div class="profile-choice-card" onclick="selectActiveUser('Rayza')">
+          <div class="profile-choice-avatar">🌸</div>
+          <h4>Rayza</h4>
+          <p>Ver e adicionar presentes</p>
+        </div>
+
+        <div class="profile-choice-card" onclick="selectActiveUser('Guilherme')">
+          <div class="profile-choice-avatar">💙</div>
+          <h4>Guilherme</h4>
+          <p>Ver e adicionar presentes</p>
+        </div>
+      </div>
+
+      <div class="pin-section">
+        <label for="pinInput">PIN de Acesso (Padrão: 1234):</label>
+        <div class="input-with-button">
+          <input type="password" id="pinInput" maxlength="6" value="1234" placeholder="1234">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="togglePinVisibility()">👁️</button>
+        </div>
+        <small class="helper-text">Seu PIN garante que as surpresas e reservas fiquem seguras!</small>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeProfileModal()">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
+
