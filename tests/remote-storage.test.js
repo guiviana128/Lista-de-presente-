@@ -11,10 +11,14 @@ test('remote changes retry conflicts, survive cold starts and preserve other wri
   process.env.BLOB_READ_WRITE_TOKEN = 'test-token';
   t.after(() => { Module._load = originalLoad; delete process.env.VERCEL; delete process.env.BLOB_READ_WRITE_TOKEN; });
   const sdk = {
+    async head() {
+      if (!stored) { const error = new Error('missing'); error.name = 'BlobNotFoundError'; throw error; }
+      return { etag: String(version) };
+    },
     async get(name, options) {
       assert.equal(options.useCache, false, 'mutable data must bypass Blob cache');
       if (!stored) return null;
-      return { stream: new Response(JSON.stringify(stored)).body, blob: { etag: String(version) } };
+      return { stream: new Response(JSON.stringify(stored)).body, blob: { etag: 'delivery-' + version } };
     },
     async put(name, body, options) {
       if (conflict) {

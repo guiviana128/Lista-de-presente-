@@ -17,10 +17,23 @@ async function readSnapshot() {
     if (!process.env.BLOB_READ_WRITE_TOKEN && !process.env.BLOB_STORE_ID) {
       throw new Error('Armazenamento permanente não configurado.');
     }
-    const { get } = require('@vercel/blob');
-    const result = await get(blobPath, { access: 'private', useCache: false });
-    if (!result) return { data: initialData(), etag: null };
-    return { data: await new Response(result.stream).json(), etag: result.blob.etag };
+    const { get, head } = require('@vercel/blob');
+    for (let attempt = 0; attempt < 5; attempt++) {
+      let before;
+      try { before = await head(blobPath); }
+      catch (error) {
+        if (error.name === 'BlobNotFoundError' || error.constructor?.name === 'BlobNotFoundError') return { data: initialData(), etag: null };
+        throw error;
+      }
+      const result = await get(blobPath, { access: 'private', useCache: false });
+      if (!result) continue;
+      const data = await new Response(result.stream).json();
+      const after = await head(blobPath);
+      // The delivery ETag from get() may differ from the control-plane ETag.
+      // Bracket the fresh content read with metadata reads to get a stable revision.
+      if (before.etag === after.etag) return { data, etag: after.etag };
+    }
+    throw new Error('A lista está sendo atualizada. Tente novamente.');
   }
   try {
     return { data: JSON.parse(await fs.readFile(dataFile, 'utf8')) };
