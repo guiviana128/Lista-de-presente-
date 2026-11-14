@@ -2,7 +2,7 @@ const API_BASE = '/api';
 const defaults = { Rayza: '🌸', Guilherme: '💙' };
 const state = {
   currentUser: localStorage.getItem('giftList_user') || 'Rayza', users: [], gifts: [],
-  filterRecipient: 'Todos', filterCategory: 'Todas', filterStatus: '', filterSort: 'recent', searchQuery: ''
+  filterRecipient: 'Todos', filterCategory: 'Todas', filterStatus: 'desejos', filterSort: 'recent', searchQuery: ''
 };
 let requestSequence = 0;
 let searchTimeout;
@@ -124,11 +124,12 @@ async function loadGifts() {
 function renderGifts() {
   const grid = $('giftsGrid');
   grid.replaceChildren();
-  const filtered = state.searchQuery || state.filterRecipient !== 'Todos' || state.filterCategory !== 'Todas' || state.filterStatus;
-  $('emptyTitle').textContent = filtered ? 'Nenhum desejo por aqui' : 'O próximo desejo começa aqui';
+  const filtered = state.searchQuery || state.filterRecipient !== 'Todos' || state.filterCategory !== 'Todas' || state.filterStatus !== 'desejos';
+  $('listHeading').textContent = state.filterStatus === 'comprado' ? 'Presentes já comprados' : state.filterRecipient === 'Todos' ? 'Nossa coleção de desejos' : state.filterRecipient === 'Nós Dois' ? 'Para viver a dois' : 'Desejos de ' + state.filterRecipient;
+  $('emptyTitle').textContent = state.filterStatus === 'comprado' ? 'Nenhum presente comprado por aqui' : filtered ? 'Nenhum desejo por aqui' : 'O próximo desejo começa aqui';
   $('emptyDescription').textContent = filtered ? 'Tente outra busca ou ajuste os filtros para encontrar seu presente.' : 'Guarde uma ideia, um sonho ou aquele presente que tem a cara de vocês.';
   $('emptyState').style.display = state.gifts.length ? 'none' : 'block';
-  $('resultsCount').textContent = state.gifts.length + (state.gifts.length === 1 ? ' desejo' : ' desejos');
+  $('resultsCount').textContent = state.gifts.length + (state.filterStatus === 'comprado' ? (state.gifts.length === 1 ? ' presente comprado' : ' presentes comprados') : (state.gifts.length === 1 ? ' desejo' : ' desejos'));
   for (const gift of state.gifts) {
     const card = document.createElement('article');
     card.className = 'gift-card' + (gift.is_bought ? ' is-bought' : '');
@@ -153,7 +154,7 @@ function renderGifts() {
           ${store ? '<a class="store-link-btn" href="' + esc(store) + '" target="_blank" rel="noopener noreferrer">Ver na loja <span>↗</span></a>' : ''}
           <div class="card-button-row">
             <button class="action-icon-btn ${gift.is_reserved ? 'active' : ''}" data-action="reserve">${gift.is_reserved ? 'Reservado' : 'Reservar'}</button>
-            <button class="action-icon-btn ${gift.is_bought ? 'active' : ''}" data-action="bought">${gift.is_bought ? '✓ Comprado' : 'Marcar comprado'}</button>
+            <button class="action-icon-btn ${gift.is_bought ? 'active' : ''}" data-action="bought">${gift.is_bought ? '✓ Comprado · desfazer' : 'Marcar comprado'}</button>
           </div>
           <div class="card-edit-row"><button data-action="copy">Copiar link</button><div><button data-action="edit">Editar</button><button class="delete" data-action="delete">Apagar</button></div></div>
         </div>
@@ -326,8 +327,19 @@ function selectRecipientTab(recipient) {
   $('listHeading').textContent = recipient === 'Todos' ? 'Nossa coleção de desejos' : recipient === 'Nós Dois' ? 'Para viver a dois' : 'Desejos de ' + recipient;
   loadGifts();
 }
-function filterByRecipient(recipient) { selectRecipientTab(recipient); $('listHeading').scrollIntoView({ behavior:'smooth', block:'center' }); }
-function filterByStatus(status) { $('statusSelect').value = status; applyFilters(); }
+function filterByRecipient(recipient) { $('statusSelect').value = 'desejos'; state.filterStatus = 'desejos'; selectRecipientTab(recipient); $('listHeading').scrollIntoView({ behavior:'smooth', block:'center' }); }
+function filterByStatus(status) {
+  state.filterRecipient = 'Todos';
+  document.querySelectorAll('#recipientTabs .segment-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.recipient === 'Todos'));
+  $('categorySelect').value = 'Todas';
+  $('searchInput').value = '';
+  $('clearSearchBtn').style.display = 'none';
+  clearTimeout(searchTimeout);
+  state.searchQuery = '';
+  $('statusSelect').value = status;
+  applyFilters();
+  $('listHeading').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
 function applyFilters() {
   state.filterCategory = $('categorySelect').value;
   state.filterStatus = $('statusSelect').value;

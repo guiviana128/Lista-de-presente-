@@ -97,6 +97,7 @@ async function getGifts(filters = {}) {
   let gifts = (await readSnapshot()).data.gifts;
   if (filters.for_who && filters.for_who !== 'Todos') gifts = gifts.filter(g => g.for_who === filters.for_who);
   if (filters.category && filters.category !== 'Todas') gifts = gifts.filter(g => g.category === filters.category);
+  if (filters.status === 'desejos') gifts = gifts.filter(g => !g.is_bought);
   if (filters.status === 'disponivel') gifts = gifts.filter(g => !g.is_bought && !g.is_reserved);
   if (filters.status === 'reservado') gifts = gifts.filter(g => g.is_reserved && !g.is_bought);
   if (filters.status === 'comprado') gifts = gifts.filter(g => g.is_bought);
