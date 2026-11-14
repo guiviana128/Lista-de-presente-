@@ -137,6 +137,39 @@ async function loadGifts() {
     loading.style.display = 'none';
 
     if (data.success && Array.isArray(data.gifts)) {
+      // Se a lista no servidor estiver vazia mas houver backup no navegador (ex: após cold-start do Vercel)
+      if (data.gifts.length === 0 && !state.searchQuery && state.filterRecipient === 'Todos' && state.filterCategory === 'Todas' && !state.filterStatus) {
+        const cached = localStorage.getItem('cached_couple_gifts');
+        if (cached) {
+          try {
+            const cachedGifts = JSON.parse(cached);
+            if (Array.isArray(cachedGifts) && cachedGifts.length > 0) {
+              // Restaura automaticamente no servidor
+              const syncRes = await fetch(`${API_BASE}/sync`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ gifts: cachedGifts })
+              });
+              const syncData = await syncRes.json();
+              if (syncData.success && syncData.gifts && syncData.gifts.length > 0) {
+                state.gifts = syncData.gifts;
+                renderGifts(syncData.gifts);
+                updateResultsCount(syncData.gifts.length);
+                loadStats();
+                return;
+              }
+            }
+          } catch (e) {
+            console.warn('Erro ao restaurar cache local:', e);
+          }
+        }
+      }
+
+      // Se temos presentes carregados, atualiza o backup local
+      if (data.gifts.length > 0 && !state.searchQuery && state.filterRecipient === 'Todos') {
+        localStorage.setItem('cached_couple_gifts', JSON.stringify(data.gifts));
+      }
+
       state.gifts = data.gifts;
       renderGifts(data.gifts);
       updateResultsCount(data.gifts.length);
@@ -358,6 +391,15 @@ async function confirmDelete(giftId, title) {
     });
     const data = await res.json();
     if (data.success) {
+      // Remove também do backup local
+      const cached = localStorage.getItem('cached_couple_gifts');
+      if (cached) {
+        try {
+          const list = JSON.parse(cached).filter(g => g.id !== giftId && g.title !== title);
+          localStorage.setItem('cached_couple_gifts', JSON.stringify(list));
+        } catch (e) {}
+      }
+
       showToast('Presente removido da lista!', 'info');
       loadGifts();
       loadStats();

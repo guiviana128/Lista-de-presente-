@@ -1,7 +1,36 @@
 const { DatabaseSync } = require('node:sqlite');
 const path = require('node:path');
+const fs = require('node:fs');
+const os = require('node:os');
 
-const DB_PATH = path.join(__dirname, 'presentes.db');
+// No Vercel / AWS Lambda, o diretório do projeto (/var/task) é estritamente SOMENTE LEITURA.
+// O único diretório com permissão de escrita é o os.tmpdir() (/tmp no Linux).
+const isServerless = Boolean(
+  process.env.VERCEL || 
+  process.env.AWS_LAMBDA_FUNCTION_NAME || 
+  (process.platform === 'linux' && __dirname.startsWith('/var/task'))
+);
+
+const DB_DIR = isServerless ? os.tmpdir() : __dirname;
+if (!fs.existsSync(DB_DIR)) {
+  try { fs.mkdirSync(DB_DIR, { recursive: true }); } catch (e) {}
+}
+
+const DB_PATH = path.join(DB_DIR, 'presentes.db');
+
+// Se estiver no Vercel e o banco ainda não existir no tmp, copia o banco base empacotado
+if (isServerless && !fs.existsSync(DB_PATH)) {
+  const sourceDb = path.join(__dirname, 'presentes.db');
+  if (fs.existsSync(sourceDb)) {
+    try {
+      fs.copyFileSync(sourceDb, DB_PATH);
+      console.log('✅ Banco de dados copiado para o diretório temporário com permissão de escrita');
+    } catch (err) {
+      console.warn('Aviso ao copiar presentes.db para tmp:', err.message);
+    }
+  }
+}
+
 const db = new DatabaseSync(DB_PATH);
 
 // Inicializa tabelas
@@ -45,11 +74,8 @@ function initDatabase() {
     `);
     insertUser.run('Rayza', '🌸', '1234', 'admin');
     insertUser.run('Guilherme', '💙', '1234', 'admin');
-    console.log('✅ Usuários padrão criados: Rayza e Guilherme (PIN padrão: 1234)');
+    console.log('✅ Usuários padrão criados: Rayza e Guilherme');
   }
-
-  // Garante que a tabela de presentes existe limpa para o casal adicionar seus presentes
-
 }
 
 // Inicializa ao carregar o arquivo
@@ -228,6 +254,44 @@ function toggleBought(id) {
   return getGiftById(id);
 }
 
+// Sincroniza presentes salvos no navegador para persistir após reinício do Vercel
+function syncGifts(giftsList) {
+  if (!Array.isArray(giftsList)) return getGifts();
+
+  const insertStmt = db.prepare(`
+    INSERT INTO gifts (
+      title, url, image_url, price, category, priority, description, created_by, for_who, is_reserved, reserved_by, is_bought
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const currentGifts = getGifts();
+  const existingKeys = new Set(currentGifts.map(g => (g.title || '') + '|' + (g.url || '')));
+
+  for (const gift of giftsList) {
+    if (!gift.title || !gift.url) continue;
+    const key = (gift.title || '') + '|' + (gift.url || '');
+    if (!existingKeys.has(key)) {
+      insertStmt.run(
+        gift.title,
+        gift.url,
+        gift.image_url || '',
+        parseFloat(gift.price) || 0,
+        gift.category || 'Geral',
+        gift.priority || '⭐⭐ Quero Muito',
+        gift.description || '',
+        gift.created_by || 'Rayza',
+        gift.for_who || 'Rayza',
+        gift.is_reserved ? 1 : 0,
+        gift.reserved_by || '',
+        gift.is_bought ? 1 : 0
+      );
+      existingKeys.add(key);
+    }
+  }
+
+  return getGifts();
+}
+
 function getStats() {
   const total = db.prepare('SELECT COUNT(*) as count FROM gifts').get().count;
   const forRayza = db.prepare("SELECT COUNT(*) as count FROM gifts WHERE for_who = 'Rayza'").get().count;
@@ -263,6 +327,6 @@ module.exports = {
   deleteGift,
   toggleReserve,
   toggleBought,
+  syncGifts,
   getStats
 };
-

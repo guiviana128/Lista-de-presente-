@@ -162,6 +162,13 @@ const server = http.createServer(async (req, res) => {
         return sendJSON(res, 200, { success: true, stats });
       }
 
+      // 5.1 Sincronização de presentes (backup e restauração contra cold-starts)
+      if (pathname === '/api/sync' && method === 'POST') {
+        const body = await parseBody(req);
+        const gifts = db.syncGifts(body.gifts || []);
+        return sendJSON(res, 200, { success: true, gifts });
+      }
+
       // 6. Listagem de Presentes
       if (pathname === '/api/gifts' && method === 'GET') {
         const gifts = db.getGifts(parsedUrl.query);
