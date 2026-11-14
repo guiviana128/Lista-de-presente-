@@ -1,78 +1,43 @@
-# 🎁 Lista de Presentes & Desejos - Rayza & Guilherme 💖
+# Lista de desejos · Rayza & Guilherme
 
-Um site completo, romântico, moderno e responsivo para você e a Rayza adicionarem links de presentes, acompanharem desejos, preços, fotos, descrições e marcarem compras e reservas secretas!
+Lista compartilhada de presentes em Node.js, HTML, CSS e JavaScript.
 
----
+## O que dá para fazer
 
-## ✨ Funcionalidades
+- Criar, editar e apagar presentes; buscar, filtrar, reservar e marcar como comprado.
+- Adicionar imagens por link, arquivo, arrastar/soltar ou copiar e colar na área de imagem.
+- Personalizar as fotos de Rayza e Guilherme nas mesmas três modalidades.
+- Usar no celular ou computador, com prévias, mensagens de erro e indicação de salvamento.
 
-- **💾 Banco de Dados SQL Permanente (SQLite)**:
-  - Todos os presentes, links, descrições, preços, categorias e status ficam salvos no arquivo `presentes.db`.
-  - Mesmo fechando o navegador ou desligando o computador, nada se perde!
-- **🔗 Inserção de Links e Detalhes**:
-  - Salva o link direto de qualquer loja (Amazon, Shopee, Mercado Livre, Zara, Sephora, Shein, etc.).
-  - Botão **"Ver na Loja"** para abrir o link com 1 clique e botão **"Copiar Link"** rápido.
-  - Imagem do produto com preview automático (e imagem ilustrativa por categoria se não tiver foto).
-  - Preço estimado formatado em Reais (R$).
-  - Descrição detalhada (tamanho, cor, cupom, observações).
-- **💑 Perfis do Casal**:
-  - Alterne facilmente entre o perfil da **Rayza 🌸** e do **Guilherme 💙** no topo da página.
-  - Identificação de quem pediu o presente ("Para Rayza", "Para Guilherme" ou "Para Nós Dois").
-- **🤫 Reserva Secreta de Surpresa**:
-  - Quer dar o presente de surpresa sem ela saber ou para evitar comprar repetido? Basta clicar em **"Reservar"**!
-  - O site avisa com sigilo quem reservou para garantir que o outro não compre igual.
-- **🎉 Status de Comprado**:
-  - Marque como comprado quando o presente for adquirido, com direito a faixa de celebração!
-- **🔍 Filtros e Busca em Tempo Real**:
-  - Pesquise por nome, loja, marca ou detalhes.
-  - Filtre por destinatário (Todos / Rayza / Guilherme / Nós Dois).
-  - Filtre por categoria (Beleza & Perfumaria, Roupas, Tech, Livros, Experiências, Decoração, etc.).
-  - Filtre por status (Disponíveis, Reservados, Já Comprados).
-  - Ordene por Menor Preço, Maior Preço, Prioridade ou Mais Recentes.
+## Rodar localmente
 
----
+Requer Node.js 24 ou superior.
 
-## 🚀 Como Iniciar o Site
-
-### Opção 1: Pelo arquivo executável (Mais Fácil)
-Dê um duplo clique no arquivo:
-👉 **`iniciar.bat`**
-
-O servidor será iniciado e seu navegador abrirá automaticamente em `http://localhost:3000`.
-
----
-
-### Opção 2: Pelo Terminal / PowerShell
-Abra a pasta do projeto no terminal e execute:
-```bash
+```sh
+npm install
 npm start
 ```
-ou diretamente:
-```bash
-node server.js
+
+Abra http://localhost:3000. Os dados locais são gravados em `data/wishlist.json`, e as imagens em `data/images/`.
+
+```sh
+npm test
 ```
 
-E acesse no seu navegador:
-👉 **[http://localhost:3000](http://localhost:3000)**
+A suíte cobre CRUD, imagens e perfil, persistência após nova instância, conflitos de gravação, falha de leitura de imagem e conclusão de uploads após fechar o editor.
 
----
+## Vercel
 
-## 📁 Estrutura de Arquivos
+Conecte um **Vercel Blob privado** ao projeto com a variável `BLOB_READ_WRITE_TOKEN`. A credencial fica exclusivamente no servidor.
 
-```
-c:\LISTA DE PRESENTE\
-├── presentes.db        # Banco de dados SQL com todos os presentes e usuários
-├── database.js         # Módulo SQLite nativo do Node.js
-├── server.js           # Servidor web e API REST
-├── package.json        # Configuração do projeto
-├── iniciar.bat         # Atalho para iniciar com 2 cliques
-└── public/             # Interface visual do site
-    ├── index.html      # Estrutura da página
-    ├── style.css       # Estilo romântico e responsivo
-    └── app.js          # Lógica interativa do site
-```
+Na Vercel, dados e imagens ficam no armazenamento privado permanente. O documento de dados é lido sem cache e atualizado com ETag para evitar perda de alterações concorrentes. Nunca é gravado em SQLite temporário. O endpoint legado de sincronização não restaura backups do navegador, evitando o retorno de presentes apagados.
 
----
+Produção usa `wishlist/v1/data.json`; previews usam `wishlist/preview/data.json`. As imagens são arquivos independentes com nomes únicos.
 
-Feito com carinho para **Rayza** e **Guilherme**! 💖
+`seed.json` contém a cópia inicial dos presentes existentes para migrar na primeira gravação. Depois que o documento permanente existe, ele passa a ser a fonte dos dados; o seed não o sobrescreve.
 
+As fotos são otimizadas pelo navegador antes do envio (até 1400 px); o servidor valida o formato e limita a imagem final a 2 MB. JPG, PNG, WebP e GIF são aceitos; o envio otimizado transforma GIF em imagem estática. Links externos dependem de o site de origem permitir a exibição.
+
+## Observação sobre perfis
+
+O seletor identifica quem está navegando. Este projeto mantém o modelo existente de lista compartilhada por quem conhece o endereço; ele não implementa uma área privada com autenticação de sessão.

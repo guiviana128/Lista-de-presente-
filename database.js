@@ -1,332 +1,162 @@
-const { DatabaseSync } = require('node:sqlite');
+const fs = require('node:fs/promises');
 const path = require('node:path');
-const fs = require('node:fs');
-const os = require('node:os');
+const { randomUUID } = require('node:crypto');
 
-// No Vercel / AWS Lambda, o diretório do projeto (/var/task) é estritamente SOMENTE LEITURA.
-// O único diretório com permissão de escrita é o os.tmpdir() (/tmp no Linux).
-const isServerless = Boolean(
-  process.env.VERCEL || 
-  process.env.AWS_LAMBDA_FUNCTION_NAME || 
-  (process.platform === 'linux' && __dirname.startsWith('/var/task'))
-);
+const remote = Boolean(process.env.VERCEL || process.env.BLOB_READ_WRITE_TOKEN);
+const dataFile = process.env.DATA_FILE || path.join(__dirname, 'data', 'wishlist.json');
+const blobPath = process.env.VERCEL_ENV === 'preview' ? 'wishlist/preview/data.json' : 'wishlist/v1/data.json';
+let queue = Promise.resolve();
 
-const DB_DIR = isServerless ? os.tmpdir() : __dirname;
-if (!fs.existsSync(DB_DIR)) {
-  try { fs.mkdirSync(DB_DIR, { recursive: true }); } catch (e) {}
+function initialData() {
+  const seed = require('./seed.json');
+  return structuredClone(seed);
 }
 
-const DB_PATH = path.join(DB_DIR, 'presentes.db');
-
-// Se estiver no Vercel e o banco ainda não existir no tmp, copia o banco base empacotado
-if (isServerless && !fs.existsSync(DB_PATH)) {
-  const sourceDb = path.join(__dirname, 'presentes.db');
-  if (fs.existsSync(sourceDb)) {
-    try {
-      fs.copyFileSync(sourceDb, DB_PATH);
-      console.log('✅ Banco de dados copiado para o diretório temporário com permissão de escrita');
-    } catch (err) {
-      console.warn('Aviso ao copiar presentes.db para tmp:', err.message);
+async function readSnapshot() {
+  if (remote) {
+    if (!process.env.BLOB_READ_WRITE_TOKEN && !process.env.BLOB_STORE_ID) {
+      throw new Error('Armazenamento permanente não configurado.');
     }
+    const { get } = require('@vercel/blob');
+    const result = await get(blobPath, { access: 'private', useCache: false });
+    if (!result) return { data: initialData(), etag: null };
+    return { data: await new Response(result.stream).json(), etag: result.blob.etag };
+  }
+  try {
+    return { data: JSON.parse(await fs.readFile(dataFile, 'utf8')) };
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+    return { data: initialData() };
   }
 }
 
-const db = new DatabaseSync(DB_PATH);
-
-// Inicializa tabelas
-function initDatabase() {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT UNIQUE NOT NULL,
-      avatar TEXT,
-      pin TEXT DEFAULT '',
-      role TEXT DEFAULT 'user',
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS gifts (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      title TEXT NOT NULL,
-      url TEXT NOT NULL,
-      image_url TEXT,
-      price REAL DEFAULT 0,
-      category TEXT DEFAULT 'Geral',
-      priority TEXT DEFAULT '⭐⭐ Quero Muito',
-      description TEXT,
-      created_by TEXT NOT NULL,
-      for_who TEXT NOT NULL,
-      is_reserved INTEGER DEFAULT 0,
-      reserved_by TEXT DEFAULT '',
-      is_bought INTEGER DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
-
-  // Verifica se já existem usuários; se não houver, cadastra Rayza e Guilherme
-  const countUsersStmt = db.prepare('SELECT COUNT(*) as count FROM users');
-  const userCount = countUsersStmt.get().count;
-
-  if (userCount === 0) {
-    const insertUser = db.prepare(`
-      INSERT INTO users (name, avatar, pin, role) VALUES (?, ?, ?, ?)
-    `);
-    insertUser.run('Rayza', '🌸', '1234', 'admin');
-    insertUser.run('Guilherme', '💙', '1234', 'admin');
-    console.log('✅ Usuários padrão criados: Rayza e Guilherme');
+async function writeSnapshot(data, etag) {
+  if (remote) {
+    const { put } = require('@vercel/blob');
+    return put(blobPath, JSON.stringify(data), {
+      access: 'private', addRandomSuffix: false, contentType: 'application/json',
+      allowOverwrite: Boolean(etag), ...(etag ? { ifMatch: etag } : {})
+    });
   }
+  await fs.mkdir(path.dirname(dataFile), { recursive: true });
+  const temporary = dataFile + '.' + randomUUID() + '.tmp';
+  await fs.writeFile(temporary, JSON.stringify(data));
+  await fs.rename(temporary, dataFile);
 }
 
-// Inicializa ao carregar o arquivo
-initDatabase();
-
-// Funções de manipulação de dados
-function getUsers() {
-  const stmt = db.prepare('SELECT id, name, avatar, role, created_at FROM users ORDER BY id ASC');
-  return stmt.all();
+function mutate(change) {
+  const operation = queue.then(async () => {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const { data, etag } = await readSnapshot();
+      const result = change(data);
+      try {
+        await writeSnapshot(data, etag);
+        return result;
+      } catch (error) {
+        if (attempt === 4) throw error;
+        if (!etag) {
+          // Another cold instance may have initialized the document first.
+          const latest = await readSnapshot();
+          if (latest.etag) continue;
+        }
+        if (error.constructor?.name !== 'BlobPreconditionFailedError' && error.name !== 'BlobPreconditionFailedError') throw error;
+      }
+    }
+  });
+  queue = operation.catch(() => {});
+  return operation;
 }
 
-function verifyUserPin(name, pin) {
-  const stmt = db.prepare('SELECT id, name, avatar, role FROM users WHERE name = ? AND pin = ?');
-  return stmt.get(name, pin);
+const publicUser = ({ pin, ...user }) => user;
+async function getUsers() { return (await readSnapshot()).data.users.map(publicUser); }
+async function getUserByName(name) { return (await getUsers()).find(u => u.name === name); }
+async function verifyUserPin(name, pin) {
+  const user = (await readSnapshot()).data.users.find(u => u.name === name && u.pin === pin);
+  return user ? publicUser(user) : undefined;
 }
-
-function getUserByName(name) {
-  const stmt = db.prepare('SELECT id, name, avatar, role FROM users WHERE name = ?');
-  return stmt.get(name);
-}
-
 function updateUserPin(name, newPin) {
-  const stmt = db.prepare('UPDATE users SET pin = ? WHERE name = ?');
-  stmt.run(newPin, name);
-  return true;
+  return mutate(data => { const u = data.users.find(u => u.name === name); if (!u) return false; u.pin = newPin; return true; });
 }
-
 function updateUserAvatar(name, avatar) {
-  const stmt = db.prepare('UPDATE users SET avatar = ? WHERE name = ?');
-  stmt.run(avatar, name);
-  return true;
+  return mutate(data => { const u = data.users.find(u => u.name === name); if (!u) return false; u.avatar = avatar; return true; });
 }
-
-function getGifts(filters = {}) {
-  let query = 'SELECT * FROM gifts WHERE 1=1';
-  const params = [];
-
-  if (filters.for_who && filters.for_who !== 'Todos') {
-    query += ' AND for_who = ?';
-    params.push(filters.for_who);
+async function getGifts(filters = {}) {
+  let gifts = (await readSnapshot()).data.gifts;
+  if (filters.for_who && filters.for_who !== 'Todos') gifts = gifts.filter(g => g.for_who === filters.for_who);
+  if (filters.category && filters.category !== 'Todas') gifts = gifts.filter(g => g.category === filters.category);
+  if (filters.status === 'disponivel') gifts = gifts.filter(g => !g.is_bought && !g.is_reserved);
+  if (filters.status === 'reservado') gifts = gifts.filter(g => g.is_reserved && !g.is_bought);
+  if (filters.status === 'comprado') gifts = gifts.filter(g => g.is_bought);
+  if (filters.search?.trim()) {
+    const term = filters.search.trim().toLocaleLowerCase('pt-BR');
+    gifts = gifts.filter(g => [g.title, g.description, g.category, g.url].some(v => String(v || '').toLocaleLowerCase('pt-BR').includes(term)));
   }
-
-  if (filters.category && filters.category !== 'Todas') {
-    query += ' AND category = ?';
-    params.push(filters.category);
-  }
-
-  if (filters.status) {
-    if (filters.status === 'disponivel') {
-      query += ' AND is_bought = 0 AND is_reserved = 0';
-    } else if (filters.status === 'reservado') {
-      query += ' AND is_reserved = 1 AND is_bought = 0';
-    } else if (filters.status === 'comprado') {
-      query += ' AND is_bought = 1';
-    }
-  }
-
-  if (filters.search && filters.search.trim() !== '') {
-    const term = `%${filters.search.trim()}%`;
-    query += ' AND (title LIKE ? OR description LIKE ? OR category LIKE ?)';
-    params.push(term, term, term);
-  }
-
-  // Ordenação
-  if (filters.sort === 'price_asc') {
-    query += ' ORDER BY price ASC';
-  } else if (filters.sort === 'price_desc') {
-    query += ' ORDER BY price DESC';
-  } else if (filters.sort === 'priority') {
-    query += ' ORDER BY priority DESC, id DESC';
-  } else {
-    // padrão: mais recentes
-    query += ' ORDER BY id DESC';
-  }
-
-  const stmt = db.prepare(query);
-  return stmt.all(...params);
+  return [...gifts].sort((a,b) => filters.sort === 'price_asc' ? a.price - b.price :
+    filters.sort === 'price_desc' ? b.price - a.price :
+    filters.sort === 'priority' ? b.priority.localeCompare(a.priority) :
+    b.created_at.localeCompare(a.created_at) || String(b.id).localeCompare(String(a.id)));
 }
-
-function getGiftById(id) {
-  const stmt = db.prepare('SELECT * FROM gifts WHERE id = ?');
-  return stmt.get(id);
+async function getGiftById(id) { return (await readSnapshot()).data.gifts.find(g => String(g.id) === String(id)); }
+function fields(data) {
+  return { title: data.title.trim(), url: data.url || '', image_url: data.image_url || '',
+    price: Number(data.price) || 0, category: data.category || 'Geral',
+    priority: data.priority || '⭐⭐ Quero Muito', description: data.description || '', for_who: data.for_who || 'Rayza' };
 }
-
-function createGift(data) {
-  const stmt = db.prepare(`
-    INSERT INTO gifts (
-      title, url, image_url, price, category, priority, description, created_by, for_who, is_reserved, reserved_by, is_bought
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, '', 0)
-  `);
-
-  const info = stmt.run(
-    data.title,
-    data.url,
-    data.image_url || '',
-    parseFloat(data.price) || 0,
-    data.category || 'Geral',
-    data.priority || '⭐⭐ Quero Muito',
-    data.description || '',
-    data.created_by || 'Anônimo',
-    data.for_who || 'Rayza'
-  );
-
-  return getGiftById(info.lastInsertRowid);
+function createGift(input) {
+  const id = randomUUID();
+  return mutate(data => {
+    const now = new Date().toISOString();
+    const gift = { ...fields(input), id, created_by: input.created_by || 'Rayza',
+      is_reserved: 0, reserved_by: '', is_bought: 0, created_at: now, updated_at: now };
+    data.gifts.push(gift);
+    return gift;
+  });
 }
-
-function updateGift(id, data) {
-  const stmt = db.prepare(`
-    UPDATE gifts SET
-      title = ?,
-      url = ?,
-      image_url = ?,
-      price = ?,
-      category = ?,
-      priority = ?,
-      description = ?,
-      for_who = ?,
-      updated_at = CURRENT_TIMESTAMP
-    WHERE id = ?
-  `);
-
-  stmt.run(
-    data.title,
-    data.url,
-    data.image_url || '',
-    parseFloat(data.price) || 0,
-    data.category || 'Geral',
-    data.priority || '⭐⭐ Quero Muito',
-    data.description || '',
-    data.for_who || 'Rayza',
-    id
-  );
-
-  return getGiftById(id);
+function updateGift(id, input) {
+  return mutate(data => {
+    const gift = data.gifts.find(g => String(g.id) === String(id));
+    if (!gift) return undefined;
+    Object.assign(gift, fields({ ...gift, ...input }), { updated_at: new Date().toISOString() });
+    return gift;
+  });
 }
-
 function deleteGift(id) {
-  const stmt = db.prepare('DELETE FROM gifts WHERE id = ?');
-  stmt.run(id);
-  return true;
+  return mutate(data => {
+    const index = data.gifts.findIndex(g => String(g.id) === String(id));
+    if (index < 0) return false;
+    data.gifts.splice(index, 1);
+    return true;
+  });
 }
-
 function toggleReserve(id, userName) {
-  const current = getGiftById(id);
-  if (!current) return null;
-
-  const newReserved = current.is_reserved ? 0 : 1;
-  const newReservedBy = newReserved ? (userName || 'Alguém especial') : '';
-
-  const stmt = db.prepare(`
-    UPDATE gifts SET
-      is_reserved = ?,
-      reserved_by = ?,
-      updated_at = CURRENT_TIMESTAMP
-    WHERE id = ?
-  `);
-
-  stmt.run(newReserved, newReservedBy, id);
-  return getGiftById(id);
+  return mutate(data => {
+    const g = data.gifts.find(g => String(g.id) === String(id));
+    if (!g) return undefined;
+    g.is_reserved = g.is_reserved ? 0 : 1;
+    g.reserved_by = g.is_reserved ? userName || 'Alguém especial' : '';
+    g.updated_at = new Date().toISOString();
+    return g;
+  });
 }
-
 function toggleBought(id) {
-  const current = getGiftById(id);
-  if (!current) return null;
-
-  const newBought = current.is_bought ? 0 : 1;
-
-  const stmt = db.prepare(`
-    UPDATE gifts SET
-      is_bought = ?,
-      updated_at = CURRENT_TIMESTAMP
-    WHERE id = ?
-  `);
-
-  stmt.run(newBought, id);
-  return getGiftById(id);
+  return mutate(data => {
+    const g = data.gifts.find(g => String(g.id) === String(id));
+    if (!g) return undefined;
+    g.is_bought = g.is_bought ? 0 : 1;
+    g.updated_at = new Date().toISOString();
+    return g;
+  });
 }
-
-// Sincroniza presentes salvos no navegador para persistir após reinício do Vercel
-function syncGifts(giftsList) {
-  if (!Array.isArray(giftsList)) return getGifts();
-
-  const insertStmt = db.prepare(`
-    INSERT INTO gifts (
-      title, url, image_url, price, category, priority, description, created_by, for_who, is_reserved, reserved_by, is_bought
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  const currentGifts = getGifts();
-  const existingKeys = new Set(currentGifts.map(g => (g.title || '') + '|' + (g.url || '')));
-
-  for (const gift of giftsList) {
-    if (!gift.title || !gift.url) continue;
-    const key = (gift.title || '') + '|' + (gift.url || '');
-    if (!existingKeys.has(key)) {
-      insertStmt.run(
-        gift.title,
-        gift.url,
-        gift.image_url || '',
-        parseFloat(gift.price) || 0,
-        gift.category || 'Geral',
-        gift.priority || '⭐⭐ Quero Muito',
-        gift.description || '',
-        gift.created_by || 'Rayza',
-        gift.for_who || 'Rayza',
-        gift.is_reserved ? 1 : 0,
-        gift.reserved_by || '',
-        gift.is_bought ? 1 : 0
-      );
-      existingKeys.add(key);
-    }
-  }
-
-  return getGifts();
+// Old clients may still call this endpoint. Browser backups are never authoritative.
+async function syncGifts() { return getGifts(); }
+async function getStats() {
+  const gifts = await getGifts();
+  return { total: gifts.length, forRayza: gifts.filter(g => g.for_who === 'Rayza').length,
+    forGuilherme: gifts.filter(g => g.for_who === 'Guilherme').length,
+    forBoth: gifts.filter(g => g.for_who === 'Nós Dois').length,
+    reserved: gifts.filter(g => g.is_reserved).length, bought: gifts.filter(g => g.is_bought).length,
+    sumPrice: Number(gifts.reduce((sum,g) => sum + g.price, 0).toFixed(2)) };
 }
+module.exports = { getUsers, getUserByName, verifyUserPin, updateUserPin, updateUserAvatar, getGifts, getGiftById,
+  createGift, updateGift, deleteGift, toggleReserve, toggleBought, syncGifts, getStats };
 
-function getStats() {
-  const total = db.prepare('SELECT COUNT(*) as count FROM gifts').get().count;
-  const forRayza = db.prepare("SELECT COUNT(*) as count FROM gifts WHERE for_who = 'Rayza'").get().count;
-  const forGuilherme = db.prepare("SELECT COUNT(*) as count FROM gifts WHERE for_who = 'Guilherme'").get().count;
-  const forBoth = db.prepare("SELECT COUNT(*) as count FROM gifts WHERE for_who = 'Nós Dois'").get().count;
-  const reserved = db.prepare('SELECT COUNT(*) as count FROM gifts WHERE is_reserved = 1').get().count;
-  const bought = db.prepare('SELECT COUNT(*) as count FROM gifts WHERE is_bought = 1').get().count;
-  
-  const sumPrice = db.prepare('SELECT SUM(price) as total FROM gifts').get().total || 0;
-
-  return {
-    total,
-    forRayza,
-    forGuilherme,
-    forBoth,
-    reserved,
-    bought,
-    sumPrice: Number(sumPrice.toFixed(2))
-  };
-}
-
-module.exports = {
-  db,
-  getUsers,
-  getUserByName,
-  verifyUserPin,
-  updateUserPin,
-  updateUserAvatar,
-  getGifts,
-  getGiftById,
-  createGift,
-  updateGift,
-  deleteGift,
-  toggleReserve,
-  toggleBought,
-  syncGifts,
-  getStats
-};

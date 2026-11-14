@@ -3,6 +3,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const url = require('node:url');
 const db = require('./database.js');
+const images = require('./images.js');
+const { validateGift, validateImage } = require('./validation.js');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -24,6 +26,7 @@ const MIME_TYPES = {
 function sendJSON(res, statusCode, data) {
   res.writeHead(statusCode, {
     'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization'
@@ -36,9 +39,8 @@ function parseBody(req) {
     let body = '';
     req.on('data', chunk => {
       body += chunk.toString();
-      if (body.length > 1e6) { // 1MB limit
-        req.destroy();
-        reject(new Error('Payload too large'));
+      if (Buffer.byteLength(body) > 4 * 1024 * 1024) {
+        reject(Object.assign(new Error('Imagem muito grande. Escolha uma imagem menor.'), { status: 413 }));
       }
     });
     req.on('end', () => {
@@ -46,7 +48,7 @@ function parseBody(req) {
       try {
         resolve(JSON.parse(body));
       } catch (err) {
-        reject(new Error('Invalid JSON format'));
+        reject(Object.assign(new Error('Dados inválidos.'), { status: 400 }));
       }
     });
     req.on('error', reject);
@@ -58,7 +60,7 @@ function serveStatic(req, res, pathname) {
   const filePath = path.join(PUBLIC_DIR, safePath);
 
   // Prevenção de Path Traversal
-  if (!filePath.startsWith(PUBLIC_DIR)) {
+  if (!filePath.startsWith(PUBLIC_DIR + path.sep)) {
     res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
     return res.end('Acesso Proibido');
   }
@@ -103,16 +105,25 @@ const server = http.createServer(async (req, res) => {
     return res.end();
   }
 
-  const parsedUrl = url.parse(req.url, true);
+  const requestUrl = new URL(req.url, 'http://localhost');
+  const parsedUrl = { pathname: requestUrl.pathname, query: Object.fromEntries(requestUrl.searchParams) };
   const pathname = parsedUrl.pathname;
   const method = req.method;
 
   try {
+    if (pathname === '/api/images' && method === 'POST') {
+      const body = await parseBody(req);
+      const imageUrl = await images.upload(body.image);
+      return sendJSON(res, 201, { success: true, url: imageUrl });
+    }
+    if (/^\/api\/images\/[a-f0-9-]+\.(png|jpg|webp|gif)$/.test(pathname) && method === 'GET') {
+      return await images.serve(pathname.split('/').pop(), res);
+    }
     // ROTAS DE API
     if (pathname.startsWith('/api/')) {
       // 1. Lista de Usuários
       if (pathname === '/api/users' && method === 'GET') {
-        const users = db.getUsers();
+        const users = await db.getUsers();
         return sendJSON(res, 200, { success: true, users });
       }
 
@@ -123,7 +134,7 @@ const server = http.createServer(async (req, res) => {
         if (!name) {
           return sendJSON(res, 400, { error: 'Nome de usuário obrigatório' });
         }
-        const user = db.verifyUserPin(name, pin || '');
+        const user = await db.verifyUserPin(name, pin || '');
         if (!user) {
           return sendJSON(res, 401, { error: 'PIN incorreto. Tente novamente!' });
         }
@@ -137,11 +148,11 @@ const server = http.createServer(async (req, res) => {
         if (!name || !newPin) {
           return sendJSON(res, 400, { error: 'Dados incompletos' });
         }
-        const user = db.verifyUserPin(name, currentPin || '');
+        const user = await db.verifyUserPin(name, currentPin || '');
         if (!user) {
           return sendJSON(res, 401, { error: 'PIN atual incorreto' });
         }
-        db.updateUserPin(name, newPin);
+        await db.updateUserPin(name, newPin);
         return sendJSON(res, 200, { success: true, message: 'PIN atualizado com sucesso!' });
       }
 
@@ -152,26 +163,27 @@ const server = http.createServer(async (req, res) => {
         if (!name || !avatar) {
           return sendJSON(res, 400, { error: 'Dados incompletos' });
         }
-        db.updateUserAvatar(name, avatar);
+        validateImage(avatar);
+        if (!await db.updateUserAvatar(name, avatar)) return sendJSON(res, 404, { error: 'Perfil não encontrado' });
         return sendJSON(res, 200, { success: true, message: 'Avatar atualizado!' });
       }
 
       // 5. Estatísticas
       if (pathname === '/api/stats' && method === 'GET') {
-        const stats = db.getStats();
+        const stats = await db.getStats();
         return sendJSON(res, 200, { success: true, stats });
       }
 
       // 5.1 Sincronização de presentes (backup e restauração contra cold-starts)
       if (pathname === '/api/sync' && method === 'POST') {
         const body = await parseBody(req);
-        const gifts = db.syncGifts(body.gifts || []);
+        const gifts = await db.syncGifts(body.gifts || []);
         return sendJSON(res, 200, { success: true, gifts });
       }
 
       // 6. Listagem de Presentes
       if (pathname === '/api/gifts' && method === 'GET') {
-        const gifts = db.getGifts(parsedUrl.query);
+        const gifts = await db.getGifts(parsedUrl.query);
         return sendJSON(res, 200, { success: true, gifts });
       }
 
@@ -185,34 +197,35 @@ const server = http.createServer(async (req, res) => {
           return sendJSON(res, 400, { error: 'O link do produto é obrigatório!' });
         }
 
-        const newGift = db.createGift(body);
+        validateGift(body);
+        const newGift = await db.createGift(body);
         return sendJSON(res, 201, { success: true, gift: newGift });
       }
 
       // Rotas com ID: /api/gifts/:id
-      const giftIdMatch = pathname.match(/^\/api\/gifts\/(\d+)(?:\/(reserve|bought))?$/);
+      const giftIdMatch = pathname.match(/^\/api\/gifts\/([a-zA-Z0-9-]+)(?:\/(reserve|bought))?$/);
       if (giftIdMatch) {
-        const id = parseInt(giftIdMatch[1], 10);
+        const id = giftIdMatch[1];
         const action = giftIdMatch[2];
 
         // Alternar reserva
         if (action === 'reserve' && method === 'POST') {
           const body = await parseBody(req);
-          const updated = db.toggleReserve(id, body.userName);
+          const updated = await db.toggleReserve(id, body.userName);
           if (!updated) return sendJSON(res, 404, { error: 'Presente não encontrado' });
           return sendJSON(res, 200, { success: true, gift: updated });
         }
 
         // Alternar comprado
         if (action === 'bought' && method === 'POST') {
-          const updated = db.toggleBought(id);
+          const updated = await db.toggleBought(id);
           if (!updated) return sendJSON(res, 404, { error: 'Presente não encontrado' });
           return sendJSON(res, 200, { success: true, gift: updated });
         }
 
         // Buscar por ID
         if (!action && method === 'GET') {
-          const gift = db.getGiftById(id);
+          const gift = await db.getGiftById(id);
           if (!gift) return sendJSON(res, 404, { error: 'Presente não encontrado' });
           return sendJSON(res, 200, { success: true, gift });
         }
@@ -223,14 +236,15 @@ const server = http.createServer(async (req, res) => {
           if (!body.title || !body.title.trim()) {
             return sendJSON(res, 400, { error: 'O título do presente é obrigatório!' });
           }
-          const updated = db.updateGift(id, body);
+          validateGift(body);
+          const updated = await db.updateGift(id, body);
           if (!updated) return sendJSON(res, 404, { error: 'Presente não encontrado' });
           return sendJSON(res, 200, { success: true, gift: updated });
         }
 
         // Deletar Presente
         if (!action && method === 'DELETE') {
-          db.deleteGift(id);
+          if (!await db.deleteGift(id)) return sendJSON(res, 404, { error: 'Presente não encontrado' });
           return sendJSON(res, 200, { success: true, message: 'Presente removido com sucesso!' });
         }
       }
@@ -243,15 +257,19 @@ const server = http.createServer(async (req, res) => {
     serveStatic(req, res, pathname);
   } catch (error) {
     console.error('Erro na requisição:', error);
-    sendJSON(res, 500, { error: 'Erro interno no servidor: ' + error.message });
+    sendJSON(res, error.status || 500, { error: error.status ? error.message : 'Não foi possível salvar ou carregar os dados. Tente novamente.' });
   }
 });
 
-server.listen(PORT, () => {
+if (require.main === module) server.listen(PORT, () => {
   console.log(`=========================================`);
   console.log(`🎁 LISTA DE PRESENTES - RAYZA & GUILHERME 💖`);
   console.log(`🚀 Servidor rodando em: http://localhost:${PORT}`);
   console.log(`📁 Banco de Dados SQLite: ${path.join(__dirname, 'presentes.db')}`);
   console.log(`=========================================`);
 });
+
+
+module.exports = server;
+
 

@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=2">
 </head>
 <body>
   <!-- Cabeçalho Principal -->
@@ -17,7 +17,7 @@
         <div class="heart-badge">💑</div>
         <div>
           <h1 class="couple-title">Rayza & Guilherme</h1>
-          <p class="couple-subtitle">Nossa Lista de Presentes & Desejos Compartilhada ✨</p>
+          <p class="couple-subtitle">Pequenos desejos. Grandes gestos de amor.</p>
         </div>
       </div>
 
@@ -39,6 +39,23 @@
       </div>
     </div>
   </header>
+  <section class="couple-hero container" aria-label="Nossa lista">
+    <div class="hero-copy"><span class="eyebrow">NOSSA LISTA, NOSSO JEITO</span>
+      <h2>O carinho mora<br>nos <em>detalhes.</em></h2>
+      <p>Um cantinho para guardar o que a gente ama — e surpreender quem faz a vida mais bonita.</p>
+      <button class="btn btn-primary" onclick="openAddModal()">＋ Guardar um desejo</button>
+    </div>
+    <div class="hero-couple">
+      <button class="portrait portrait-rayza" onclick="openProfileModal('Rayza')" aria-label="Editar foto de Rayza">
+        <span class="portrait-image" data-avatar="Rayza">🌸</span><span class="portrait-caption">Rayza <small>editar foto ↗</small></span>
+      </button>
+      <span class="couple-amp" aria-hidden="true">&amp;</span>
+      <button class="portrait portrait-guilherme" onclick="openProfileModal('Guilherme')" aria-label="Editar foto de Guilherme">
+        <span class="portrait-image" data-avatar="Guilherme">💙</span><span class="portrait-caption">Guilherme <small>editar foto ↗</small></span>
+      </button>
+      <span class="hero-note">as nossas coisas favoritas ♡</span>
+    </div>
+  </section>
 
   <!-- Banner de Estatísticas -->
   <section class="stats-section">
@@ -159,7 +176,7 @@
 
     <!-- Lista de Presentes -->
     <div class="list-header-row">
-      <h2 class="section-heading" id="listHeading">Todos os Presentes</h2>
+      <h2 class="section-heading" id="listHeading">Nossa coleção de desejos</h2>
       <span class="count-badge" id="resultsCount">0 itens encontrados</span>
     </div>
 
@@ -170,11 +187,12 @@
 
     <div id="emptyState" class="empty-state" style="display: none;">
       <div class="empty-icon">🎁✨</div>
-      <h3>Nenhum presente encontrado</h3>
-      <p>Nenhum item corresponde aos filtros ou a lista ainda está vazia.</p>
+      <h3 id="emptyTitle">Nenhum presente encontrado</h3>
+      <p id="emptyDescription">Nenhum item corresponde aos filtros ou a lista ainda está vazia.</p>
       <button class="btn btn-primary" onclick="openAddModal()">Adicionar o Primeiro Presente 💝</button>
     </div>
 
+    <div class="load-error" id="loadError" hidden><p>Não foi possível carregar seus desejos.</p><button class="btn btn-secondary" onclick="loadGifts()">Tentar novamente</button></div>
     <!-- Grid de Cards de Presente -->
     <div class="gifts-grid" id="giftsGrid">
       <!-- Inserido dinamicamente via app.js -->
@@ -185,16 +203,16 @@
   <footer class="main-footer">
     <div class="container footer-content">
       <p>Feito com amor para <strong>Rayza</strong> & <strong>Guilherme</strong> 💖</p>
-      <p class="footer-sub">Seus presentes ficam salvos permanentemente no banco de dados SQLite.</p>
+      <p class="footer-sub">Um lugar para sonhar juntos e guardar cada detalhe.</p>
     </div>
   </footer>
 
   <!-- MODAL: Adicionar / Editar Presente -->
   <div class="modal-overlay" id="giftModal" onclick="handleModalOverlayClick(event, 'giftModal')">
-    <div class="modal-box modal-lg">
+    <div class="modal-box modal-lg" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
       <div class="modal-header">
         <h3 id="modalTitle">💝 Adicionar Novo Presente</h3>
-        <button class="modal-close-btn" onclick="closeGiftModal()">✕</button>
+        <button class="modal-close-btn" aria-label="Fechar editor de presente" onclick="closeGiftModal()">✕</button>
       </div>
 
       <form id="giftForm" onsubmit="handleGiftFormSubmit(event)">
@@ -204,14 +222,14 @@
           <!-- Nome do Presente -->
           <div class="form-group full-width">
             <label for="giftTitle">Nome do Presente / Produto *</label>
-            <input type="text" id="giftTitle" required placeholder="Ex: Perfume Good Girl, Tênis Nike, Livro...">
+            <input type="text" id="giftTitle" maxlength="200" required placeholder="Ex: Perfume Good Girl, Tênis Nike, Livro...">
           </div>
 
           <!-- Link do Produto -->
           <div class="form-group full-width">
             <label for="giftUrl">Link do Produto (URL da Loja) *</label>
             <div class="input-with-button">
-              <input type="url" id="giftUrl" required placeholder="https://www.loja.com.br/produto...">
+              <input type="text" inputmode="url" id="giftUrl" required placeholder="https://www.loja.com.br/produto...">
               <button type="button" class="btn btn-secondary btn-sm" onclick="testUrl()">Testar Link ↗</button>
             </div>
             <small class="helper-text">Copie e cole o link da Amazon, Mercado Livre, Shopee, Shein, Zara, etc.</small>
@@ -259,9 +277,21 @@
 
           <!-- Link da Imagem -->
           <div class="form-group full-width">
-            <label for="giftImageUrl">Link da Foto / Imagem do Produto (Opcional)</label>
-            <input type="url" id="giftImageUrl" placeholder="https://exemplo.com/foto.jpg" oninput="updateImagePreview()">
-            <small class="helper-text">Se não colocar imagem, usaremos uma foto ilustrativa linda da categoria.</small>
+            <label for="giftImageUrl">Imagem do presente</label>
+            <input type="text" inputmode="url" id="giftImageUrl" placeholder="https://exemplo.com/foto.jpg" oninput="onImageUrlChange('gift')">
+<div class="image-zone" id="giftImageZone" tabindex="0" aria-label="Área para colar ou soltar imagem">
+  <span class="image-zone-icon" aria-hidden="true">▧</span><strong>Uma imagem deixa tudo mais especial</strong>
+  <span>Arraste aqui ou clique nesta área e use Ctrl+V para colar.</span>
+  <div class="image-zone-actions">
+    <label class="btn btn-secondary btn-sm file-choice" for="giftImageFile">Escolher arquivo</label>
+    <input type="file" id="giftImageFile" accept="image/*" class="visually-hidden">
+    <button class="btn btn-secondary btn-sm" type="button" onclick="pasteImage('gift')">Colar imagem</button>
+    <button class="image-remove" type="button" onclick="removeImage('gift')">Remover foto</button>
+  </div>
+  <small class="helper-text">JPG, PNG, WebP ou GIF. A foto é otimizada automaticamente.</small>
+  <small class="image-status" id="giftImageStatus" role="status"></small>
+</div>
+            <small class="helper-text">Cole o link direto da imagem ou envie uma foto abaixo.</small>
             <div id="imagePreviewContainer" class="image-preview-container" style="display:none;">
               <img id="imagePreview" src="" alt="Preview">
             </div>
@@ -270,7 +300,7 @@
           <!-- Descrição / Detalhes -->
           <div class="form-group full-width">
             <label for="giftDescription">Descrição / Observações</label>
-            <textarea id="giftDescription" rows="3" placeholder="Ex: Tamanho M, Cor Azul Marinho, modelo 128GB, cupom de primeira compra..."></textarea>
+            <textarea id="giftDescription" maxlength="5000" rows="3" placeholder="Ex: Tamanho M, Cor Azul Marinho, modelo 128GB, cupom de primeira compra..."></textarea>
           </div>
         </div>
 
@@ -282,47 +312,39 @@
     </div>
   </div>
 
-  <!-- MODAL: Trocar Perfil / Login -->
   <div class="modal-overlay" id="profileModal" onclick="handleModalOverlayClick(event, 'profileModal')">
-    <div class="modal-box modal-sm">
-      <div class="modal-header">
-        <h3>💑 Quem está navegando?</h3>
-        <button class="modal-close-btn" onclick="closeProfileModal()">✕</button>
-      </div>
-
-      <div class="profile-cards-grid">
-        <div class="profile-choice-card" onclick="selectActiveUser('Rayza')">
-          <div class="profile-choice-avatar">🌸</div>
-          <h4>Rayza</h4>
-          <p>Ver e adicionar presentes</p>
+    <section class="modal-box modal-profile" role="dialog" aria-modal="true" aria-labelledby="profileEditorName">
+      <div class="modal-header"><div><span class="eyebrow">DO NOSSO JEITO</span><h3 id="profileEditorName">Seu perfil</h3></div>
+      <button type="button" class="modal-close-btn" aria-label="Fechar perfil" onclick="closeProfileModal()">✕</button></div>
+      <div class="profile-content">
+        <p class="profile-switch-label">Quem está por aqui?</p>
+        <div class="profile-cards-grid">
+          <button type="button" class="profile-choice-card" data-profile="Rayza" onclick="selectActiveUser('Rayza')"><span class="profile-choice-avatar" data-avatar="Rayza">🌸</span><strong>Rayza</strong></button>
+          <button type="button" class="profile-choice-card" data-profile="Guilherme" onclick="selectActiveUser('Guilherme')"><span class="profile-choice-avatar" data-avatar="Guilherme">💙</span><strong>Guilherme</strong></button>
         </div>
-
-        <div class="profile-choice-card" onclick="selectActiveUser('Guilherme')">
-          <div class="profile-choice-avatar">💙</div>
-          <h4>Guilherme</h4>
-          <p>Ver e adicionar presentes</p>
-        </div>
-      </div>
-
-      <div class="pin-section">
-        <label for="pinInput">PIN de Acesso (Padrão: 1234):</label>
-        <div class="input-with-button">
-          <input type="password" id="pinInput" maxlength="6" value="1234" placeholder="1234">
-          <button type="button" class="btn btn-secondary btn-sm" onclick="togglePinVisibility()">👁️</button>
-        </div>
-        <small class="helper-text">Seu PIN garante que as surpresas e reservas fiquem seguras!</small>
-      </div>
-
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" onclick="closeProfileModal()">Fechar</button>
-      </div>
-    </div>
+        <div class="profile-photo-editor"><div class="profile-photo-preview" id="profileImagePreview"></div><p>Uma foto com a sua cara.<br><small>Ela aparece no perfil e no início da lista.</small></p></div>
+        <div class="form-group"><label for="profileImageUrl">Link da sua foto</label><input id="profileImageUrl" type="text" inputmode="url" placeholder="https://exemplo.com/minha-foto.jpg" oninput="onImageUrlChange('profile')"></div>
+        <div class="image-zone" id="profileImageZone" tabindex="0" aria-label="Área para colar ou soltar imagem">
+  <span class="image-zone-icon" aria-hidden="true">▧</span><strong>Uma imagem deixa tudo mais especial</strong>
+  <span>Arraste aqui ou clique nesta área e use Ctrl+V para colar.</span>
+  <div class="image-zone-actions">
+    <label class="btn btn-secondary btn-sm file-choice" for="profileImageFile">Escolher arquivo</label>
+    <input type="file" id="profileImageFile" accept="image/*" class="visually-hidden">
+    <button class="btn btn-secondary btn-sm" type="button" onclick="pasteImage('profile')">Colar imagem</button>
+    <button class="image-remove" type="button" onclick="removeImage('profile')">Remover foto</button>
   </div>
-
+  <small class="helper-text">JPG, PNG, WebP ou GIF. A foto é otimizada automaticamente.</small>
+  <small class="image-status" id="profileImageStatus" role="status"></small>
+</div>
+      </div>
+      <div class="modal-footer"><button type="button" class="btn btn-secondary" onclick="closeProfileModal()">Cancelar</button><button type="button" class="btn btn-primary" id="saveProfileBtn" onclick="saveProfileImage()">Salvar foto</button></div>
+    </section>
+  </div>
   <!-- TOAST NOTIFICATION CONTAINER -->
-  <div id="toastContainer" class="toast-container"></div>
+  <div id="toastContainer" class="toast-container" role="status" aria-live="polite"></div>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=2"></script>
 </body>
 </html>
+
 

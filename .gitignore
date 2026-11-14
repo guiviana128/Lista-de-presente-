@@ -1,5 +1,8 @@
 node_modules/
-.DS_Store
-Thumbs.db
-*.log
-
+data/
+.env*
+.vercel/
+*.db
+*.db-shm
+*.db-wal
+seed.db
