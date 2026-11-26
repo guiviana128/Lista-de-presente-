@@ -156,7 +156,7 @@ function renderGifts() {
             <button class="action-icon-btn ${gift.is_reserved ? 'active' : ''}" data-action="reserve">${gift.is_reserved ? 'Reservado' : 'Reservar'}</button>
             <button class="action-icon-btn ${gift.is_bought ? 'active' : ''}" data-action="bought">${gift.is_bought ? '✓ Comprado · desfazer' : 'Marcar comprado'}</button>
           </div>
-          <div class="card-edit-row"><button data-action="copy">Copiar link</button><div><button data-action="edit">Editar</button><button class="delete" data-action="delete">Apagar</button></div></div>
+          <div class="card-edit-row"><button data-action="copy">Copiar link</button><div class="card-edit-actions"><button type="button" class="card-icon-btn" data-action="edit" aria-label="Editar" title="Editar"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4Z"/></svg></button><button type="button" class="card-icon-btn delete" data-action="delete" aria-label="Apagar" title="Apagar"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button></div></div>
         </div>
       </div>`;
     card.querySelector('img')?.addEventListener('error', event => {

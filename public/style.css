@@ -1248,7 +1248,11 @@ body { background: #fcf8f5; color: var(--text-main); }
 .card-edit-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .card-edit-row button { border: none; background: transparent; padding: 6px 4px; color: #896f76; font: inherit; font-size: .7rem; cursor: pointer; }
 .card-edit-row button:hover { color: #87364d; text-decoration: underline; }
-.card-edit-row .delete { color: #a84c59; margin-left: 10px; }
+.card-edit-actions { display: inline-flex; align-items: center; gap: 4px; }
+.card-edit-row .card-icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border-radius: 9px; color: #896f76; transition: var(--transition); }
+.card-edit-row .card-icon-btn:hover { background: #f8ecee; color: #87364d; text-decoration: none; }
+.card-edit-row .delete { color: #a84c59; margin-left: 2px; }
+.card-edit-row .card-icon-btn.delete:hover { background: #fdecef; color: #be123c; }
 .gift-card.is-bought { opacity: 1; background: #fffefd; border-color: #d5e4d8; }
 .modal-overlay { background: #34272ec2; }
 .modal-box { border-radius: 22px; }
