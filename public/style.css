@@ -1376,5 +1376,197 @@ button:focus-visible, a:focus-visible, .image-zone:focus-visible, .file-choice:f
   *, *::before, *::after { animation-duration: .01ms!important; transition-duration: .01ms!important; scroll-behavior: auto!important; }
 }
 
+/* Custom selects alinhados ao design romântico vinho/rosê do site */
+.cselect {
+  position: relative;
+  min-width: 162px;
+}
+
+.form-group .cselect {
+  width: 100%;
+  min-width: 0;
+}
+
+.cselect-native {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+  pointer-events: none;
+}
+
+.cselect-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px 8px 12px;
+  border: 1px solid #eadbdd;
+  border-radius: 11px;
+  background: #fffcfa;
+  color: #633b47;
+  font-family: inherit;
+  font-size: 0.76rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.form-group .cselect-trigger {
+  min-height: 43px;
+  padding: 10px 12px 10px 14px;
+  border-radius: 12px;
+  border-color: #ecdfdc;
+  background: #faf7f5;
+  color: var(--text-main);
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+
+.cselect-trigger:hover {
+  border-color: #cda6b2;
+  background: #ffffff;
+}
+
+.cselect.open .cselect-trigger,
+.cselect-trigger:focus-visible {
+  outline: none;
+  border-color: #87364d;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(135, 54, 77, 0.13);
+}
+
+.cselect-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.cselect-arrow {
+  width: 20px;
+  height: 20px;
+  border-radius: 7px;
+  background: #f8ecee;
+  color: #87364d;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+.cselect.open .cselect-arrow {
+  transform: rotate(180deg);
+  background: #87364d;
+  color: #ffffff;
+}
+
+.cselect-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 100%;
+  width: max-content;
+  max-width: min(320px, calc(100vw - 40px));
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 6px;
+  margin: 0;
+  list-style: none;
+  border-radius: 14px;
+  border: 1px solid #e6d1d7;
+  background: #fffefd;
+  box-shadow: 0 18px 38px rgba(52, 39, 46, 0.16);
+  z-index: 1200;
+}
+
+.form-group .cselect-menu {
+  width: 100%;
+  max-width: 100%;
+}
+
+.cselect.open-up .cselect-menu {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+
+.cselect-menu[hidden] {
+  display: none;
+}
+
+.cselect-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 11px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: #633b47;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+
+.form-group .cselect-option {
+  font-size: 0.85rem;
+}
+
+.cselect-option:hover,
+.cselect-option:focus-visible {
+  outline: none;
+  background: #fbf2f3;
+  color: #87364d;
+}
+
+.cselect-option[aria-selected="true"] {
+  background: #f8ecee;
+  color: #87364d;
+  font-weight: 700;
+}
+
+.cselect-check {
+  color: #87364d;
+  font-size: 0.78rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.cselect-menu::-webkit-scrollbar {
+  width: 6px;
+}
+
+.cselect-menu::-webkit-scrollbar-thumb {
+  background: #dec2ca;
+  border-radius: 999px;
+}
+
+@media (max-width: 768px) {
+  .select-wrapper .cselect {
+    width: 100%;
+    min-width: 0;
+  }
+  .select-wrapper .cselect-trigger {
+    font-size: 0.74rem;
+    padding: 8px 10px;
+  }
+  .form-group .cselect-trigger {
+    font-size: 16px;
+  }
+}
+
 
 

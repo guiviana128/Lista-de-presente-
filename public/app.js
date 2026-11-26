@@ -206,6 +206,7 @@ function openAddModal() {
   $('giftImageFile').value = '';
   $('modalTitle').textContent = 'Um novo desejo';
   $('saveGiftBtn').textContent = 'Salvar presente';
+  syncCustomSelects();
   updateImagePreview();
   openModal('giftModal');
   $('giftTitle').focus();
@@ -220,6 +221,7 @@ async function openEditModal(id) {
     for (const [element,key] of Object.entries({ giftId:'id', giftTitle:'title', giftUrl:'url', giftForWho:'for_who', giftPrice:'price', giftCategory:'category', giftPriority:'priority', giftImageUrl:'image_url', giftDescription:'description' })) $(element).value = gift[key] ?? '';
     $('modalTitle').textContent = 'Editar desejo';
     $('saveGiftBtn').textContent = 'Salvar alterações';
+    syncCustomSelects();
     updateImagePreview();
     openModal('giftModal');
   } catch (error) { showToast(error.message, 'error'); }
@@ -327,7 +329,7 @@ function selectRecipientTab(recipient) {
   $('listHeading').textContent = recipient === 'Todos' ? 'Nossa coleção de desejos' : recipient === 'Nós Dois' ? 'Para viver a dois' : 'Desejos de ' + recipient;
   loadGifts();
 }
-function filterByRecipient(recipient) { $('statusSelect').value = 'desejos'; state.filterStatus = 'desejos'; selectRecipientTab(recipient); $('listHeading').scrollIntoView({ behavior:'smooth', block:'center' }); }
+function filterByRecipient(recipient) { $('statusSelect').value = 'desejos'; state.filterStatus = 'desejos'; syncCustomSelects(); selectRecipientTab(recipient); $('listHeading').scrollIntoView({ behavior:'smooth', block:'center' }); }
 function filterByStatus(status) {
   state.filterRecipient = 'Todos';
   document.querySelectorAll('#recipientTabs .segment-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.recipient === 'Todos'));
@@ -337,6 +339,7 @@ function filterByStatus(status) {
   clearTimeout(searchTimeout);
   state.searchQuery = '';
   $('statusSelect').value = status;
+  syncCustomSelects();
   applyFilters();
   $('listHeading').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
@@ -352,7 +355,150 @@ function handleSearch() {
   searchTimeout = setTimeout(() => { state.searchQuery = $('searchInput').value.trim(); loadGifts(); }, 250);
 }
 function clearSearch() { $('searchInput').value = ''; $('clearSearchBtn').style.display = 'none'; state.searchQuery = ''; loadGifts(); }
+const customSelectRegistry = [];
+function closeAllCustomSelects(except = null) {
+  customSelectRegistry.forEach(({ wrap, trigger, menu }) => {
+    if (wrap === except) return;
+    wrap.classList.remove('open', 'open-up');
+    menu.hidden = true;
+    trigger.setAttribute('aria-expanded', 'false');
+  });
+}
+function syncCustomSelects() {
+  customSelectRegistry.forEach(({ select, labelEl, menu }) => {
+    const selected = select.options[select.selectedIndex] || select.options[0];
+    labelEl.textContent = selected ? selected.textContent : '';
+    menu.querySelectorAll('.cselect-option').forEach(btn => {
+      const active = btn.dataset.value === select.value;
+      btn.setAttribute('aria-selected', String(active));
+      const check = btn.querySelector('.cselect-check');
+      if (check) check.textContent = active ? '✓' : '';
+    });
+  });
+}
+function initCustomSelects() {
+  if (typeof document.querySelectorAll !== 'function' || typeof document.createElement !== 'function') return;
+  document.querySelectorAll('select').forEach(select => {
+    if (select.dataset.customized) return;
+    select.dataset.customized = '1';
+
+    const wrap = document.createElement('div');
+    wrap.className = 'cselect';
+    select.parentNode.insertBefore(wrap, select);
+    wrap.appendChild(select);
+    select.classList.add('cselect-native');
+    select.tabIndex = -1;
+
+    const trigger = document.createElement('button');
+    trigger.type = 'button';
+    trigger.className = 'cselect-trigger';
+    trigger.setAttribute('aria-haspopup', 'listbox');
+    trigger.setAttribute('aria-expanded', 'false');
+    const assocLabel = select.id ? document.querySelector(`label[for="${select.id}"]`) : null;
+    if (assocLabel) trigger.setAttribute('aria-label', assocLabel.textContent.replace(/:$/, '').trim());
+
+    const labelEl = document.createElement('span');
+    labelEl.className = 'cselect-label';
+    const arrow = document.createElement('span');
+    arrow.className = 'cselect-arrow';
+    arrow.setAttribute('aria-hidden', 'true');
+    arrow.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    trigger.append(labelEl, arrow);
+
+    const menu = document.createElement('ul');
+    menu.className = 'cselect-menu';
+    menu.setAttribute('role', 'listbox');
+    menu.hidden = true;
+
+    Array.from(select.options).forEach(opt => {
+      const li = document.createElement('li');
+      li.setAttribute('role', 'presentation');
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'cselect-option';
+      btn.setAttribute('role', 'option');
+      btn.dataset.value = opt.value;
+
+      const textSpan = document.createElement('span');
+      textSpan.textContent = opt.textContent;
+      const checkSpan = document.createElement('span');
+      checkSpan.className = 'cselect-check';
+      checkSpan.setAttribute('aria-hidden', 'true');
+      btn.append(textSpan, checkSpan);
+
+      btn.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        select.value = opt.value;
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+        syncCustomSelects();
+        closeAllCustomSelects();
+        trigger.focus();
+      });
+      li.appendChild(btn);
+      menu.appendChild(li);
+    });
+
+    trigger.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      const willOpen = menu.hidden;
+      closeAllCustomSelects(wrap);
+      if (willOpen) {
+        menu.hidden = false;
+        wrap.classList.add('open');
+        trigger.setAttribute('aria-expanded', 'true');
+        const rect = trigger.getBoundingClientRect();
+        const modalBox = trigger.closest('.modal-box');
+        const limitBottom = modalBox ? Math.min(window.innerHeight, modalBox.getBoundingClientRect().bottom) : window.innerHeight;
+        const spaceBelow = limitBottom - rect.bottom;
+        const spaceAbove = rect.top - (modalBox ? Math.max(0, modalBox.getBoundingClientRect().top) : 0);
+        wrap.classList.toggle('open-up', spaceBelow < 245 && spaceAbove > spaceBelow);
+      } else {
+        closeAllCustomSelects();
+      }
+    });
+
+    trigger.addEventListener('keydown', event => {
+      const options = Array.from(menu.querySelectorAll('.cselect-option'));
+      const currentIdx = options.findIndex(b => b.dataset.value === select.value);
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        const step = event.key === 'ArrowDown' ? 1 : -1;
+        const next = options[(currentIdx + step + options.length) % options.length];
+        if (next) {
+          select.value = next.dataset.value;
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+          syncCustomSelects();
+        }
+      } else if (event.key === 'Escape' && !menu.hidden) {
+        event.preventDefault();
+        event.stopPropagation();
+        closeAllCustomSelects();
+      }
+    });
+
+    if (assocLabel) {
+      assocLabel.addEventListener('click', event => {
+        event.preventDefault();
+        trigger.focus();
+        trigger.click();
+      });
+    }
+
+    select.addEventListener('change', syncCustomSelects);
+    wrap.append(trigger, menu);
+    customSelectRegistry.push({ select, wrap, trigger, labelEl, menu });
+  });
+
+  document.addEventListener('click', event => {
+    if (!event.target.closest('.cselect')) closeAllCustomSelects();
+  });
+
+  syncCustomSelects();
+}
 document.addEventListener('DOMContentLoaded', () => {
+  initCustomSelects();
   if (!defaults[state.currentUser]) state.currentUser = 'Rayza';
   updateUserHeader();
   loadUsers().catch(error => showToast(error.message,'error'));
@@ -369,7 +515,12 @@ document.addEventListener('DOMContentLoaded', () => {
     zone.addEventListener('dragleave',() => zone.classList.remove('dragging'));
     zone.addEventListener('drop',event => { event.preventDefault(); zone.classList.remove('dragging'); chooseImage(event.dataTransfer.files[0],target); });
   }
-  document.addEventListener('keydown',event => { if (event.key === 'Escape') document.querySelectorAll('.modal-overlay.active').forEach(modal => closeModal(modal.id)); });
+  document.addEventListener('keydown',event => {
+    if (event.key === 'Escape') {
+      if (customSelectRegistry.some(item => !item.menu.hidden)) { closeAllCustomSelects(); return; }
+      document.querySelectorAll('.modal-overlay.active').forEach(modal => closeModal(modal.id));
+    }
+  });
 });
 
 
